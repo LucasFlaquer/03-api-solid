@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { hash } from 'bcryptjs'
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 
@@ -9,7 +10,16 @@ export async function register(request: FastifyRequest, reply: FastifyReply) {
     password: z.string().min(6),
   })
   const { name, email, password } = registerBodySchema.parse(request.body)
-  await prisma.user.create({ data: { name, email, password_hash: password } })
+  const password_hash = await hash(password, 6)
+  const userWithSameEmail = await prisma.user.findUnique({
+    where: {
+      email,
+    },
+  })
+  if (userWithSameEmail) {
+    return reply.status(409).send()
+  }
+  await prisma.user.create({ data: { name, email, password_hash } })
   console.log('created User')
   return reply.status(201).send()
 }
